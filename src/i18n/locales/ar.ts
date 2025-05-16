@@ -22,7 +22,7 @@ const ar = {
     restart: 'إعادة التشغيل الآن',
     clearSearch: 'مسح البحث',
     notAvailable: 'غير متوفر',
-    poweredBy: 'مدعوم بواسطة SSC (Secure Shield Consulting)',
+    poweredBy: 'مدعوم بواسطة SSC YAGRI',
     theme: {
       light: 'فاتح',
       dark: 'داكن',
@@ -45,7 +45,16 @@ const ar = {
     yes: 'نعم',
     no: 'لا',
     sessionExpired: 'انتهت جلستك. الرجاء تسجيل الدخول مرة أخرى.',
-    appExpired: 'انتهت صلاحية التطبيق. يرجى الاتصال بالدعم.'
+    appExpired: 'انتهت صلاحية التطبيق. يرجى الاتصال بالدعم.',
+    emailRequired: "Email is required.",
+    requestFailed: "Failed to send request.",
+    passwordRequestSent: "Request sent successfully.",
+    enterEmailToSendPassword: "Enter your email",
+    needPassword: "Need a Password?",
+    submit: "Submit",
+    cancel: "Cancel",
+    emailAlreadyUsed: "This email already has a pending request.",
+    installIdAlreadyUsed: "This device already has a pending request."
   },
   calculator: {
     solutionType: 'نوع المحلول',

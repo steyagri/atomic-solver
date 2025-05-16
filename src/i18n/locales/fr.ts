@@ -22,7 +22,7 @@ const fr = {
     restart: 'Redémarrer Maintenant',
     clearSearch: 'Effacer la recherche',
     notAvailable: 'N/D',
-    poweredBy: 'Propulsé par SSC (Secure Shield Consulting)',
+    poweredBy: 'Propulsé par SSC YAGRI',
     theme: {
       light: 'Clair',
       dark: 'Sombre',
@@ -45,7 +45,16 @@ const fr = {
     yes: 'Oui',
     no: 'Non',
     sessionExpired: 'Votre session a expiré. Veuillez vous reconnecter.',
-    appExpired: 'L\'application a expiré. Veuillez contacter le support.'
+    appExpired: 'L\'application a expiré. Veuillez contacter le support.',
+    emailRequired: "Email is required.",
+    requestFailed: "Failed to send request.",
+    passwordRequestSent: "Request sent successfully.",
+    enterEmailToSendPassword: "Enter your email",
+    needPassword: "Need a Password?",
+    submit: "Submit",
+    cancel: "Cancel",
+    emailAlreadyUsed: "This email already has a pending request.",
+    installIdAlreadyUsed: "This device already has a pending request."
   },
   calculator: {
     solutionType: 'Type de Solution',

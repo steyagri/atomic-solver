@@ -2,6 +2,7 @@ const en = {
   common: {
     appName: 'Atomic Solver',
     calculate: 'Calculate',
+    logout: 'Logout',
     clear: 'Clear',
     error: 'Error',
     success: 'Success',
@@ -22,7 +23,7 @@ const en = {
     restart: 'Restart Now',
     clearSearch: 'Clear search',
     notAvailable: 'N/A',
-    poweredBy: 'Powered by SSC (Secure Shield Consulting)',
+    poweredBy: 'powered by YAGRI',
     theme: {
       light: 'Light',
       dark: 'Dark',
@@ -37,6 +38,8 @@ const en = {
     login: 'Login',
     passwordRequired: 'Please enter your password',
     invalidPassword: 'Invalid password. Please try again.',
+    passwordNotApproved: "This password is not approved yet.",
+    passwordExpired: "This password has expired.",
     loginError: 'An error occurred during login. Please try again.',
     passwordHelp: 'Enter the administrator password',
     forgotPassword: 'Forgot Password?',
@@ -45,7 +48,16 @@ const en = {
     yes: 'Yes',
     no: 'No',
     sessionExpired: 'Your session has expired. Please log in again.',
-    appExpired: 'Application has expired. Please contact support.'
+    appExpired: 'Application has expired. Please contact support.',
+    emailRequired: "Email is required.",
+    requestFailed: "Failed to send request.",
+    passwordRequestSent: "Request sent successfully.",
+    enterEmailToSendPassword: "Enter your email",
+    needPassword: "Need a Password?",
+    submit: "Submit",
+    cancel: "Cancel",
+    emailAlreadyUsed: "This email already has a pending request.",
+    installIdAlreadyUsed: "This device already has a pending request."
   },
   calculator: {
     solutionType: 'Solution Type',
