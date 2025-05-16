@@ -1,22 +1,23 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ENV } from '../constants/env';
-import { compareHash, generateHash } from '../utils/hash';
+import { doc, getDoc } from 'firebase/firestore';
+import DeviceInfo from 'react-native-device-info';
+import { db } from '../firebase/firebase';
 
-// Constants with fallbacks
-const HASHED_PASSWORD = ENV.HASHED_PASSWORD;
-const SESSION_DURATION_DAYS = ENV.SESSION_DURATION_DAYS;
-
-// Session key for storage
+// Session constants
 const SESSION_KEY = 'auth_session';
+const PASSWORD_EXPIRY_DAYS = 7;
 
-// Define the Auth context type
+// Firestore password request interface
+interface PasswordRequest {
+  email: string;
+  deviceId: string;
+  installId: string;
+  requestedAt: { toDate: () => Date }; // Assume it's a Firestore Timestamp
+  status: 'pending' | 'approved';
+}
+
+// Auth context type
 type AuthContextType = {
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -24,10 +25,8 @@ type AuthContextType = {
   logout: () => Promise<void>;
 };
 
-// Create the Auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Auth provider props
 type AuthProviderProps = {
   children: ReactNode;
 };
@@ -36,25 +35,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Check if there's an active session on app start
+  const getInstallId = async () => {
+    let installId = await AsyncStorage.getItem('INSTALL_ID');
+    if (!installId) {
+      installId = 'InNOScEnce-' + Math.random().toString(36).substr(2, 9);
+      await AsyncStorage.setItem('INSTALL_ID', installId);
+    }
+    return installId;
+  };
+
+  // Load session on start
   useEffect(() => {
     const checkSession = async () => {
       try {
         const sessionData = await AsyncStorage.getItem(SESSION_KEY);
-        
         if (sessionData) {
           const session = JSON.parse(sessionData);
-          const sessionExpiry = new Date(session.expiresAt);
-          
-          if (sessionExpiry > new Date()) {
+          const expiry = new Date(session.expiresAt);
+          if (expiry > new Date()) {
             setIsAuthenticated(true);
           } else {
-            // Session expired, clean up
             await AsyncStorage.removeItem(SESSION_KEY);
           }
         }
       } catch (error) {
-        console.error('Error checking auth session:', error);
+        console.error('Error checking session:', error);
       } finally {
         setIsLoading(false);
       }
@@ -63,32 +68,57 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     checkSession();
   }, []);
 
-  // Login function
+  // Login function using Firestore doc ID as password
   const login = async (password: string): Promise<boolean> => {
     try {
-      // Compare password with stored hash using our custom function
-      const isMatch = await compareHash(password, HASHED_PASSWORD);
-      
-      if (isMatch) {
-        // Create session with expiry date
-        const days = parseInt(SESSION_DURATION_DAYS, 10);
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + days);
-        
-        // Store session data
+      const deviceId = DeviceInfo.getDeviceId() || 'UnknownDevice';
+      const installId = await getInstallId();
+
+      const passwordDocRef = doc(db, 'passwordRequests', password.trim());
+      const passwordDoc = await getDoc(passwordDocRef);
+
+      if (!passwordDoc.exists()) {
+        return false;
+      }
+
+      const data = passwordDoc.data() as PasswordRequest;
+
+      // Check approval status
+      if (data.status !== 'approved') {
+        return false;
+      }
+
+      // Check expiration
+      const expiresAt = data.requestedAt.toDate();
+      expiresAt.setDate(expiresAt.getDate() + PASSWORD_EXPIRY_DAYS);
+
+      if (expiresAt < new Date()) {
+        return false;
+      }
+
+      // Validate device and install ID match
+      if (
+        data.deviceId === deviceId &&
+        data.installId === installId
+      ) {
+        // Save session
+        const sessionExpiry = new Date();
+        sessionExpiry.setDate(sessionExpiry.getDate() + 7); // Example session duration
+
         await AsyncStorage.setItem(
           SESSION_KEY,
           JSON.stringify({
             authenticated: true,
-            expiresAt: expiresAt.toISOString(),
+            expiresAt: sessionExpiry.toISOString(),
           })
         );
-        
+
         setIsAuthenticated(true);
         return true;
       }
-      
+
       return false;
+
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -96,7 +126,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   // Logout function
-  const logout = async (): Promise<void> => {
+  const logout = async () => {
     try {
       await AsyncStorage.removeItem(SESSION_KEY);
       setIsAuthenticated(false);
@@ -112,16 +142,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   );
 };
 
-// Hook for using the auth context
+// Hook to use auth
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
-  
   return context;
 };
-
-// Export our hash generator
-export { generateHash }; 
