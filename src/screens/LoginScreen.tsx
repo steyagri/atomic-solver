@@ -2,18 +2,31 @@ import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
-  Image,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
   StatusBar,
+  Image,
 } from 'react-native';
 import { TextInput, Button, Text, Snackbar } from 'react-native-paper';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { AppStackParamList } from '../navigation/AppNavigator';
+
+// Firebase and Device
+import DeviceInfo from 'react-native-device-info';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/firebase';
+
+const INSTALL_ID_KEY = 'INSTALL_ID';
+
+type LoginScreenNavigationProp = StackNavigationProp<AppStackParamList, 'Login'>;
 
 const LoginScreen = () => {
   const { login } = useAuth();
@@ -24,6 +37,20 @@ const LoginScreen = () => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [error, setError] = useState('');
   const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [email, setEmail] = useState('');
+  const [showPasswordRequestModal, setShowPasswordRequestModal] = useState(false);
+
+  const navigation = useNavigation<LoginScreenNavigationProp>();
+
+  // Generate or retrieve install ID
+  const getInstallId = async () => {
+    let installId = await AsyncStorage.getItem(INSTALL_ID_KEY);
+    if (!installId) {
+      installId = 'InNOScEnce-' + Math.random().toString(36).substr(2, 9);
+      await AsyncStorage.setItem(INSTALL_ID_KEY, installId);
+    }
+    return installId;
+  };
 
   // Check if app has expired (February 2028)
   const checkAppExpiration = () => {
@@ -33,31 +60,31 @@ const LoginScreen = () => {
   };
 
   const handleLogin = async () => {
-    // Check for app expiration first
     if (checkAppExpiration()) {
-      setError(t('auth.appExpired', 'Application has expired. Please contact support.'));
+      setError(t('auth.appExpired', 'Application has expired.'));
       setSnackbarVisible(true);
       return;
     }
 
     if (!password.trim()) {
-      setError(t('auth.passwordRequired'));
+      setError(t('auth.passwordRequired', 'Password is required'));
       setSnackbarVisible(true);
       return;
     }
 
     setIsLoading(true);
-    setError('');
 
     try {
       const success = await login(password);
-      if (!success) {
-        setError(t('auth.invalidPassword'));
+      if (success) {
+        navigation.navigate("Calculator");
+      } else {
+        setError(t('auth.invalidPassword', 'Invalid or expired password'));
         setSnackbarVisible(true);
       }
     } catch (error) {
       console.error('Login error:', error);
-      setError(t('auth.loginError'));
+      setError(t('auth.loginError', 'An error occurred during login.'));
       setSnackbarVisible(true);
     } finally {
       setIsLoading(false);
@@ -66,6 +93,66 @@ const LoginScreen = () => {
 
   const dismissSnackbar = () => {
     setSnackbarVisible(false);
+  };
+
+  const handleRequestPassword = async () => {
+    if (!email.trim()) {
+      setError(t('auth.emailRequired', 'Email is required'));
+      setSnackbarVisible(true);
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const deviceId = DeviceInfo.getDeviceId() || 'UnknownDevice';
+      const installId = await getInstallId();
+
+      const requestRef = collection(db, 'passwordRequests');
+
+      const emailQuery = query(requestRef, where('email', '==', email.trim()));
+      const installIdQuery = query(requestRef, where('installId', '==', installId));
+
+      const [emailSnapshot, installIdSnapshot] = await Promise.all([
+        getDocs(emailQuery),
+        getDocs(installIdQuery),
+      ]);
+
+      if (!emailSnapshot.empty) {
+        setError(t('auth.emailAlreadyUsed', 'This email already has a pending request.'));
+        setSnackbarVisible(true);
+        setIsLoading(false);
+        return;
+      }
+
+      if (!installIdSnapshot.empty) {
+        setError(t('auth.installIdAlreadyUsed', 'This device already has a pending request.'));
+        setSnackbarVisible(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // No existing request — proceed
+      await addDoc(collection(db, 'passwordRequests'), {
+        email: email.trim(),
+        deviceId,
+        installId,
+        requestedAt: new Date(),
+        status: 'pending',
+      });
+
+      setEmail('');
+      setShowPasswordRequestModal(false);
+      setError(t('auth.passwordRequestSent', 'Request sent successfully.'));
+      setSnackbarVisible(true);
+
+    } catch (err) {
+      console.error('Error submitting request:', err);
+      setError(t('auth.requestFailed', 'Failed to submit request.'));
+      setSnackbarVisible(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -78,27 +165,18 @@ const LoginScreen = () => {
         backgroundColor={theme.colors.background}
         barStyle={theme.dark ? 'light-content' : 'dark-content'}
       />
-      
-      {/* Language Switcher at the top */}
+
+      {/* Language Switcher */}
       <View style={styles.languageSwitcherContainer}>
         <LanguageSwitcher />
       </View>
-      
+
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.inner}>
           <View style={styles.logoContainer}>
-            {/* You can replace this with your app logo */}
             <Text style={[styles.appName, { color: theme.colors.primary }]}>
               {t('common.appName')}
             </Text>
-            
-            {/* Optional: Lottie animation */}
-            {/* <LottieView
-              source={require('../../assets/animations/login-animation.json')}
-              autoPlay
-              loop
-              style={styles.animation}
-            /> */}
           </View>
 
           <View style={styles.formContainer}>
@@ -127,9 +205,7 @@ const LoginScreen = () => {
                 error={!!error}
               />
 
-              {!!error && (
-                <Text style={styles.errorText}>{error}</Text>
-              )}
+              {!!error && <Text style={styles.errorText}>{error}</Text>}
 
               <Button
                 mode="contained"
@@ -140,24 +216,32 @@ const LoginScreen = () => {
               >
                 {t('auth.login')}
               </Button>
+
+              <Button
+                mode="text"
+                onPress={() => setShowPasswordRequestModal(true)}
+                style={styles.forgotPasswordButton}
+              >
+                {t('auth.needPassword', 'Need a Password?')}
+              </Button>
             </View>
           </View>
-          
-          {/* SSC logo and Powered by text */}
+
+          {/* Powered by YAGRI */}
           <View style={styles.poweredByContainer}>
             <Image 
-              source={require('../../assets/images/ssc.png')} 
+              source={require('../../assets/images/YAGRINV.png')} 
               style={styles.sscLogo} 
               resizeMode="contain" 
             />
             <Text style={styles.poweredByText}>
-              {t('common.poweredBy', 'Powered by SSC (Secure Shield Consulting)')}
+              {t('common.poweredBy', 'Powered by YAGRI')}
             </Text>
           </View>
         </View>
       </TouchableWithoutFeedback>
 
-      {/* Snackbar for error messages */}
+      {/* Snackbar for errors */}
       <Snackbar
         visible={snackbarVisible}
         onDismiss={dismissSnackbar}
@@ -174,10 +258,51 @@ const LoginScreen = () => {
           {error}
         </Text>
       </Snackbar>
+
+      {/* Modal for Password Request */}
+      {showPasswordRequestModal && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>
+              {t('auth.enterEmailToSendPassword', 'Enter your email')}
+            </Text>
+            <TextInput
+              label={t('auth.email')}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              mode="outlined"
+              style={styles.modalInput}
+              disabled={isLoading}
+            />
+            <Button
+              mode="contained"
+              onPress={handleRequestPassword}
+              loading={isLoading}
+              disabled={isLoading}
+              style={styles.modalButton}
+            >
+              {t('auth.submit')}
+            </Button>
+            <Button
+              mode="text"
+              onPress={() => setShowPasswordRequestModal(false)}
+              disabled={isLoading}
+              style={styles.modalCancel}
+            >
+              {t('auth.cancel')}
+            </Button>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
 
+export default LoginScreen;
+
+// ✅ Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -202,10 +327,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 16,
   },
-  animation: {
-    width: 200,
-    height: 200,
-  },
   formContainer: {
     width: '100%',
   },
@@ -228,6 +349,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 8,
   },
+  forgotPasswordButton: {
+    marginTop: 16,
+  },
   errorText: {
     color: '#B00020',
     fontSize: 14,
@@ -249,6 +373,38 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-});
 
-export default LoginScreen; 
+  // Modal Styles
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    padding: 24,
+    zIndex: 10,
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 8,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalInput: {
+    marginBottom: 16,
+  },
+  modalButton: {
+    marginTop: 8,
+  },
+  modalCancel: {
+    marginTop: 8,
+  },
+});

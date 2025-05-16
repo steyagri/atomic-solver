@@ -1,6 +1,6 @@
 // src/screens/CalculatorScreen.tsx
 import React, { useState, useCallback, useEffect } from 'react';
-import { StyleSheet, View, Platform, StatusBar as RNStatusBar, Image } from 'react-native';
+import { StyleSheet, View, Platform, StatusBar as RNStatusBar, Image, TouchableOpacity, Modal } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { Text, Surface, Button, Card, Divider, useTheme, IconButton, Portal, FAB, Snackbar } from 'react-native-paper';
 import { CalculationInput, ValidationError, SolidChemical, LiquidChemical, ConcentrationType } from '../types/calculator';
@@ -18,6 +18,13 @@ import type { CustomTheme } from '../theme/theme';
 import { useTranslation } from 'react-i18next';
 import { isRTL } from '../i18n';
 import i18n from '../i18n';
+import LogoutUtil from '../utils/LogoutUtil';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { AppStackParamList } from '../navigation/AppNavigator';
+import { CommonActions, useNavigation } from '@react-navigation/native';
+
+
+type CalculatorScreenNavigationProp = StackNavigationProp<AppStackParamList, 'Calculator'>;
 
 // Helper function to add days to a date
 const addDays = (date: Date, days: number): Date => {
@@ -44,6 +51,8 @@ const CalculatorScreen: React.FC = () => {
   const theme = useTheme() as CustomTheme;
   const { t } = useTranslation();
   const rtl = isRTL();
+  const navigation = useNavigation<CalculatorScreenNavigationProp>();
+  
   
   const [solutionType, setSolutionType] = useState<'solid' | 'liquid'>('solid');
   const [selectedChemical, setSelectedChemical] = useState<SolidChemical | LiquidChemical | null>(null);
@@ -63,6 +72,7 @@ const CalculatorScreen: React.FC = () => {
   const [preparatorName, setPreparatorName] = useState<string>('');
   const [preparationDate] = useState<Date>(new Date());
   const [expirationDate] = useState<Date>(addDays(new Date(), 15));
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     if (selectedHydrationState) {
@@ -527,8 +537,24 @@ const CalculatorScreen: React.FC = () => {
             <Image source={require('../../assets/images/fablab.png')} style={styles.fablabLogo} resizeMode="contain" />
             <Image source={require('../../assets/images/fst.png')} style={styles.fstLogo} resizeMode="contain" />
           </View>
+          <Button
+  mode="contained"
+  onPress={() => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      })
+    );
+  }}
+  style={styles.button}
+  icon="logout" // Icon similar to its function
+  contentStyle={styles.buttonContent}
+>
+  {t('common.logout')}
+</Button>
         </View>
-        
+    
         <View style={styles.header}>
           <Text style={styles.appTitle}>{t('common.appName')}</Text>
           <View style={styles.headerActions}>
@@ -563,10 +589,11 @@ const CalculatorScreen: React.FC = () => {
         )}
         
         <View style={styles.poweredByContainer}>
-          <Image source={require('../../assets/images/ssc.png')} style={styles.sscLogo} resizeMode="contain" />
-          <Text style={styles.poweredByText}>{t('common.poweredBy', 'Powered by SSC (Secure Shield Consulting)')}</Text>
+          <Image source={require('../../assets/images/YAGRINV.png')} style={styles.sscLogo} resizeMode="contain" />
+          <Text style={styles.poweredByText}>{t('common.poweredBy', 'Powered by YAGRI')}</Text>
         </View>
       </ScrollView>
+       
       
       <Snackbar
         visible={snackbarVisible}
@@ -584,6 +611,21 @@ const CalculatorScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+    modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+  },
+  closeButton: {
+    marginTop: 16,
+  },
   container: {
     flex: 1,
   },
@@ -709,6 +751,8 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     borderRadius: 8,
   },
+
+ 
 });
 
 export default CalculatorScreen; 
