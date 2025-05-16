@@ -8,6 +8,7 @@ import { useTheme } from './src/context/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import './src/i18n'; // Import i18n configuration
 import { useTranslation } from 'react-i18next';
+import { AuthProvider } from './src/context/AuthContext';
 
 function Main() {
   const { theme } = useTheme();
@@ -17,6 +18,7 @@ function Main() {
   // This prevents conflicts between different parts of the app trying to manage RTL
 
   return (
+    <AuthProvider>
     <PaperProvider theme={theme}>
       <StatusBar
         barStyle={theme.dark ? 'light-content' : 'dark-content'}
@@ -24,6 +26,7 @@ function Main() {
       />
       <AppNavigator />
     </PaperProvider>
+    </AuthProvider>
   );
 }
 
